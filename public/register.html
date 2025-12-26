@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Регистрация на розыгрыш</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            margin-bottom: 20px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        .number-display {
+            font-size: 48px;
+            font-weight: bold;
+            color: #667eea;
+            margin: 20px 0;
+        }
+
+        .info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎁 Регистрация на розыгрыш</h1>
+        <p class="subtitle">Введите ваше имя (необязательно)</p>
+        
+        <form id="registerForm">
+            <input 
+                type="text" 
+                id="nameInput" 
+                placeholder="Ваше имя (необязательно)" 
+                autocomplete="off"
+            >
+            <button type="submit" id="submitBtn">Зарегистрироваться</button>
+        </form>
+
+        <div id="message" class="message"></div>
+
+        <div id="numberDisplay" style="display: none;">
+            <div class="number-display" id="numberValue"></div>
+            <p>Ваш номер для розыгрыша!</p>
+        </div>
+
+        <div class="info" id="info">
+            <p>После регистрации вам будет присвоен уникальный номер от 1 до 60</p>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('registerForm');
+        const nameInput = document.getElementById('nameInput');
+        const submitBtn = document.getElementById('submitBtn');
+        const message = document.getElementById('message');
+        const numberDisplay = document.getElementById('numberDisplay');
+        const numberValue = document.getElementById('numberValue');
+        const info = document.getElementById('info');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Регистрация...';
+            message.className = 'message';
+            message.style.display = 'none';
+            numberDisplay.style.display = 'none';
+
+            const name = nameInput.value.trim();
+
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name: name || undefined })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    message.className = 'message success';
+                    message.textContent = data.message;
+                    message.style.display = 'block';
+                    
+                    numberValue.textContent = data.number;
+                    numberDisplay.style.display = 'block';
+                    info.style.display = 'none';
+                    
+                    form.style.display = 'none';
+                } else {
+                    message.className = 'message error';
+                    message.textContent = data.error || 'Ошибка регистрации';
+                    message.style.display = 'block';
+                }
+            } catch (error) {
+                message.className = 'message error';
+                message.textContent = 'Ошибка соединения с сервером';
+                message.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Зарегистрироваться';
+            }
+        });
+    </script>
+</body>
+</html>
+
