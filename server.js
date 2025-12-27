@@ -174,6 +174,27 @@ app.get('/api/count', (req, res) => {
   });
 });
 
+// Проверить существование номера участника
+app.get('/api/check-number/:number', (req, res) => {
+  const number = parseInt(req.params.number);
+  
+  if (isNaN(number)) {
+    return res.status(400).json({ error: 'Неверный номер' });
+  }
+
+  db.get('SELECT * FROM participants WHERE number = ?', [number], (err, row) => {
+    if (err) {
+      return res.status(500).json({ error: 'Ошибка базы данных' });
+    }
+    
+    res.json({ 
+      exists: !!row,
+      number: number,
+      participant: row || null
+    });
+  });
+});
+
 // Рандомайзер - выбор победителей
 app.post('/api/raffle', (req, res) => {
   const count = parseInt(req.body.count) || 10;

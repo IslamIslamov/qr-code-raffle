@@ -157,18 +157,42 @@
         const STORAGE_KEY = 'raffle_participant_number';
 
         // Проверяем, есть ли сохраненный номер при загрузке страницы
-        function checkSavedRegistration() {
+        async function checkSavedRegistration() {
             const savedNumber = localStorage.getItem(STORAGE_KEY);
-            if (savedNumber) {
-                // Показываем сохраненный номер
-                numberValue.textContent = savedNumber;
-                numberDisplay.style.display = 'block';
-                form.style.display = 'none';
-                info.style.display = 'none';
-                
-                message.className = 'message success';
-                message.textContent = `Вы уже зарегистрированы под номером ${savedNumber}`;
-                message.style.display = 'block';
+            if (!savedNumber) {
+                return; // Нет сохраненного номера, показываем форму
+            }
+
+            // Проверяем, существует ли номер в базе данных
+            try {
+                const response = await fetch(`/api/check-number/${savedNumber}`);
+                const data = await response.json();
+
+                if (data.exists) {
+                    // Номер существует в базе - показываем его
+                    numberValue.textContent = savedNumber;
+                    numberDisplay.style.display = 'block';
+                    form.style.display = 'none';
+                    info.style.display = 'none';
+                    
+                    message.className = 'message success';
+                    message.textContent = `Вы уже зарегистрированы под номером ${savedNumber}`;
+                    message.style.display = 'block';
+                } else {
+                    // Номера нет в базе (база была очищена) - очищаем localStorage
+                    localStorage.removeItem(STORAGE_KEY);
+                    // Показываем форму для новой регистрации
+                    form.style.display = 'block';
+                    numberDisplay.style.display = 'none';
+                    message.style.display = 'none';
+                }
+            } catch (error) {
+                // Ошибка при проверке - очищаем localStorage на всякий случай
+                console.error('Ошибка проверки номера:', error);
+                localStorage.removeItem(STORAGE_KEY);
+                form.style.display = 'block';
+                numberDisplay.style.display = 'none';
+                message.style.display = 'none';
             }
         }
 
@@ -181,10 +205,24 @@
             // Проверяем, не зарегистрирован ли уже пользователь
             const savedNumber = localStorage.getItem(STORAGE_KEY);
             if (savedNumber) {
-                message.className = 'message success';
-                message.textContent = `Вы уже зарегистрированы под номером ${savedNumber}`;
-                message.style.display = 'block';
-                return;
+                // Проверяем, существует ли номер в базе
+                try {
+                    const checkResponse = await fetch(`/api/check-number/${savedNumber}`);
+                    const checkData = await checkResponse.json();
+                    
+                    if (checkData.exists) {
+                        message.className = 'message success';
+                        message.textContent = `Вы уже зарегистрированы под номером ${savedNumber}`;
+                        message.style.display = 'block';
+                        return;
+                    } else {
+                        // Номера нет в базе - очищаем localStorage
+                        localStorage.removeItem(STORAGE_KEY);
+                    }
+                } catch (error) {
+                    // Игнорируем ошибку проверки, продолжаем регистрацию
+                    console.error('Ошибка проверки номера:', error);
+                }
             }
             
             submitBtn.disabled = true;
