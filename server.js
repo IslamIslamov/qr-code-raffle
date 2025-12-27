@@ -79,15 +79,36 @@ const db = new sqlite3.Database('./raffle.db', (err) => {
 // Генерация QR-кода
 app.get('/api/qrcode', async (req, res) => {
   try {
-    // Используем публичный URL если доступен, иначе локальный IP
-    const registrationUrl = publicUrl 
-      ? `${publicUrl}/register`
-      : `http://${HOST}:${PORT}/register`;
+    // Определяем публичный URL
+    let registrationUrl;
+    
+    if (NODE_ENV === 'production') {
+      // В продакшене используем Railway URL или хост из запроса
+      const railwayUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
+        ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+        : (req.headers.host ? `https://${req.headers.host}` : null);
+      
+      if (railwayUrl) {
+        registrationUrl = `${railwayUrl}/register`;
+      } else {
+        // Fallback: используем протокол и хост из запроса
+        const protocol = req.headers['x-forwarded-proto'] || 'https';
+        const host = req.headers.host || req.get('host');
+        registrationUrl = `${protocol}://${host}/register`;
+      }
+    } else if (publicUrl) {
+      // В разработке используем туннель если создан
+      registrationUrl = `${publicUrl}/register`;
+    } else {
+      // Локальный доступ
+      registrationUrl = `http://${HOST}:${PORT}/register`;
+    }
+    
     const qrCodeDataURL = await QRCode.toDataURL(registrationUrl);
     res.json({ 
       qrcode: qrCodeDataURL, 
       url: registrationUrl,
-      isPublic: !!publicUrl
+      isPublic: NODE_ENV === 'production' || !!publicUrl
     });
   } catch (err) {
     res.status(500).json({ error: 'Ошибка генерации QR-кода' });
