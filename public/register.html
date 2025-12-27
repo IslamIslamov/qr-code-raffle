@@ -154,8 +154,38 @@
         const numberValue = document.getElementById('numberValue');
         const info = document.getElementById('info');
 
+        const STORAGE_KEY = 'raffle_participant_number';
+
+        // Проверяем, есть ли сохраненный номер при загрузке страницы
+        function checkSavedRegistration() {
+            const savedNumber = localStorage.getItem(STORAGE_KEY);
+            if (savedNumber) {
+                // Показываем сохраненный номер
+                numberValue.textContent = savedNumber;
+                numberDisplay.style.display = 'block';
+                form.style.display = 'none';
+                info.style.display = 'none';
+                
+                message.className = 'message success';
+                message.textContent = `Вы уже зарегистрированы под номером ${savedNumber}`;
+                message.style.display = 'block';
+            }
+        }
+
+        // Проверяем при загрузке страницы
+        checkSavedRegistration();
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
+            
+            // Проверяем, не зарегистрирован ли уже пользователь
+            const savedNumber = localStorage.getItem(STORAGE_KEY);
+            if (savedNumber) {
+                message.className = 'message success';
+                message.textContent = `Вы уже зарегистрированы под номером ${savedNumber}`;
+                message.style.display = 'block';
+                return;
+            }
             
             submitBtn.disabled = true;
             submitBtn.textContent = 'Регистрация...';
@@ -177,6 +207,9 @@
                 const data = await response.json();
 
                 if (response.ok) {
+                    // Сохраняем номер в localStorage
+                    localStorage.setItem(STORAGE_KEY, data.number.toString());
+                    
                     message.className = 'message success';
                     message.textContent = data.message;
                     message.style.display = 'block';
