@@ -82,35 +82,36 @@ app.get('/api/qrcode', async (req, res) => {
     // Определяем публичный URL
     let registrationUrl;
     
-    if (NODE_ENV === 'production') {
-      // В продакшене используем Railway URL или хост из запроса
-      const railwayUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
-        ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
-        : (req.headers.host ? `https://${req.headers.host}` : null);
-      
-      if (railwayUrl) {
-        registrationUrl = `${railwayUrl}/register`;
-      } else {
-        // Fallback: используем протокол и хост из запроса
-        const protocol = req.headers['x-forwarded-proto'] || 'https';
-        const host = req.headers.host || req.get('host');
-        registrationUrl = `${protocol}://${host}/register`;
-      }
-    } else if (publicUrl) {
-      // В разработке используем туннель если создан
+    // Приоритет 1: Railway публичный домен из переменной окружения
+    if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+      registrationUrl = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/register`;
+    }
+    // Приоритет 2: Хост из заголовков запроса (Railway всегда передает)
+    else if (req.headers.host) {
+      const protocol = req.headers['x-forwarded-proto'] || 
+                      (req.secure ? 'https' : 'http') || 
+                      'https';
+      registrationUrl = `${protocol}://${req.headers.host}/register`;
+    }
+    // Приоритет 3: Туннель в разработке
+    else if (publicUrl) {
       registrationUrl = `${publicUrl}/register`;
-    } else {
-      // Локальный доступ
+    }
+    // Приоритет 4: Локальный доступ (только для разработки)
+    else {
       registrationUrl = `http://${HOST}:${PORT}/register`;
     }
+    
+    console.log('🔗 Генерирую QR-код для URL:', registrationUrl);
     
     const qrCodeDataURL = await QRCode.toDataURL(registrationUrl);
     res.json({ 
       qrcode: qrCodeDataURL, 
       url: registrationUrl,
-      isPublic: NODE_ENV === 'production' || !!publicUrl
+      isPublic: !registrationUrl.includes('localhost') && !registrationUrl.includes('127.0.0.1')
     });
   } catch (err) {
+    console.error('❌ Ошибка генерации QR-кода:', err);
     res.status(500).json({ error: 'Ошибка генерации QR-кода' });
   }
 });
