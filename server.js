@@ -57,7 +57,9 @@ app.get('/register', (req, res) => {
 app.use(express.static('public'));
 
 // Инициализация базы данных
-const db = new sqlite3.Database('./raffle.db', (err) => {
+// На Railway используем переменную окружения для пути к БД, иначе локальный путь
+const dbPath = process.env.DATABASE_PATH || './raffle.db';
+const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Ошибка подключения к БД:', err.message);
   } else {
