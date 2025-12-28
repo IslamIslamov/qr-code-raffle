@@ -116,6 +116,82 @@
             font-size: 14px;
             color: #666;
         }
+
+        .winner-screen {
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .winner-screen.show {
+            display: block;
+        }
+
+        .winner-badge {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 20px;
+            margin: 20px 0;
+            box-shadow: 0 10px 30px rgba(40, 167, 69, 0.3);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+
+        .winner-icon {
+            font-size: 64px;
+            margin-bottom: 15px;
+        }
+
+        .winner-title {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .winner-number {
+            font-size: 48px;
+            font-weight: bold;
+            margin: 20px 0;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            display: inline-block;
+        }
+
+        .winner-message {
+            font-size: 18px;
+            opacity: 0.95;
+            margin-top: 15px;
+        }
+
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            background: #f0f;
+            position: absolute;
+            animation: confetti-fall 3s linear infinite;
+        }
+
+        @keyframes confetti-fall {
+            0% {
+                transform: translateY(-100vh) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
     </style>
 </head>
 <body>
@@ -140,6 +216,15 @@
             <p>Ваш номер для розыгрыша!</p>
         </div>
 
+        <div id="winnerScreen" class="winner-screen">
+            <div class="winner-badge">
+                <div class="winner-icon">🏆</div>
+                <div class="winner-title">ПОЗДРАВЛЯЕМ!</div>
+                <div class="winner-number" id="winnerNumber">#0</div>
+                <div class="winner-message">Вы выиграли в розыгрыше! 🎉</div>
+            </div>
+        </div>
+
         <div class="info" id="info">
             <p>После регистрации вам будет присвоен уникальный номер от 1 до 60</p>
         </div>
@@ -153,8 +238,11 @@
         const numberDisplay = document.getElementById('numberDisplay');
         const numberValue = document.getElementById('numberValue');
         const info = document.getElementById('info');
+        const winnerScreen = document.getElementById('winnerScreen');
+        const winnerNumber = document.getElementById('winnerNumber');
 
         const STORAGE_KEY = 'raffle_participant_number';
+        let winnerCheckInterval = null;
 
         // Проверяем, есть ли сохраненный номер при загрузке страницы
         async function checkSavedRegistration() {
@@ -169,21 +257,30 @@
                 const data = await response.json();
 
                 if (data.exists) {
-                    // Номер существует в базе - показываем его
-                    numberValue.textContent = savedNumber;
-                    numberDisplay.style.display = 'block';
-                    form.style.display = 'none';
-                    info.style.display = 'none';
-                    
-                    message.className = 'message success';
-                    message.textContent = `Вы уже зарегистрированы под номером ${savedNumber}`;
-                    message.style.display = 'block';
+                    // Проверяем, является ли пользователь победителем
+                    if (data.isWinner) {
+                        // Показываем экран победителя
+                        showWinnerScreen(savedNumber);
+                        startWinnerCheck(savedNumber);
+                    } else {
+                        // Номер существует, но не победитель - показываем обычный экран
+                        numberValue.textContent = savedNumber;
+                        numberDisplay.style.display = 'block';
+                        form.style.display = 'none';
+                        info.style.display = 'none';
+                        winnerScreen.classList.remove('show');
+                        
+                        message.className = 'message success';
+                        message.textContent = `Вы зарегистрированы под номером ${savedNumber}`;
+                        message.style.display = 'block';
+                    }
                 } else {
                     // Номера нет в базе (база была очищена) - очищаем localStorage
                     localStorage.removeItem(STORAGE_KEY);
                     // Показываем форму для новой регистрации
                     form.style.display = 'block';
                     numberDisplay.style.display = 'none';
+                    winnerScreen.classList.remove('show');
                     message.style.display = 'none';
                 }
             } catch (error) {
@@ -192,8 +289,40 @@
                 localStorage.removeItem(STORAGE_KEY);
                 form.style.display = 'block';
                 numberDisplay.style.display = 'none';
+                winnerScreen.classList.remove('show');
                 message.style.display = 'none';
             }
+        }
+
+        // Показываем экран победителя
+        function showWinnerScreen(number) {
+            winnerNumber.textContent = `#${number}`;
+            winnerScreen.classList.add('show');
+            form.style.display = 'none';
+            numberDisplay.style.display = 'none';
+            info.style.display = 'none';
+            message.style.display = 'none';
+        }
+
+        // Запускаем проверку статуса победителя
+        function startWinnerCheck(number) {
+            // Очищаем предыдущий интервал если есть
+            if (winnerCheckInterval) {
+                clearInterval(winnerCheckInterval);
+            }
+            
+            // Проверяем периодически, стал ли пользователь победителем
+            winnerCheckInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/api/check-number/${number}`);
+                    const data = await response.json();
+                    if (data.isWinner) {
+                        showWinnerScreen(number);
+                    }
+                } catch (error) {
+                    console.error('Ошибка проверки статуса победителя:', error);
+                }
+            }, 3000); // Проверяем каждые 3 секунды
         }
 
         // Проверяем при загрузке страницы
@@ -211,9 +340,14 @@
                     const checkData = await checkResponse.json();
                     
                     if (checkData.exists) {
-                        message.className = 'message success';
-                        message.textContent = `Вы уже зарегистрированы под номером ${savedNumber}`;
-                        message.style.display = 'block';
+                        if (checkData.isWinner) {
+                            showWinnerScreen(savedNumber);
+                            startWinnerCheck(savedNumber);
+                        } else {
+                            message.className = 'message success';
+                            message.textContent = `Вы уже зарегистрированы под номером ${savedNumber}`;
+                            message.style.display = 'block';
+                        }
                         return;
                     } else {
                         // Номера нет в базе - очищаем localStorage
@@ -246,17 +380,32 @@
 
                 if (response.ok) {
                     // Сохраняем номер в localStorage
-                    localStorage.setItem(STORAGE_KEY, data.number.toString());
+                    const registeredNumber = data.number.toString();
+                    localStorage.setItem(STORAGE_KEY, registeredNumber);
                     
-                    message.className = 'message success';
-                    message.textContent = data.message;
-                    message.style.display = 'block';
+                    // Проверяем, является ли пользователь победителем
+                    const checkResponse = await fetch(`/api/check-number/${registeredNumber}`);
+                    const checkData = await checkResponse.json();
                     
-                    numberValue.textContent = data.number;
-                    numberDisplay.style.display = 'block';
-                    info.style.display = 'none';
-                    
-                    form.style.display = 'none';
+                    if (checkData.isWinner) {
+                        // Показываем экран победителя
+                        showWinnerScreen(registeredNumber);
+                        startWinnerCheck(registeredNumber);
+                    } else {
+                        // Обычный экран регистрации
+                        message.className = 'message success';
+                        message.textContent = data.message;
+                        message.style.display = 'block';
+                        
+                        numberValue.textContent = registeredNumber;
+                        numberDisplay.style.display = 'block';
+                        info.style.display = 'none';
+                        
+                        form.style.display = 'none';
+                        
+                        // Проверяем периодически, стал ли пользователь победителем
+                        startWinnerCheck(registeredNumber);
+                    }
                 } else {
                     message.className = 'message error';
                     message.textContent = data.error || 'Ошибка регистрации';

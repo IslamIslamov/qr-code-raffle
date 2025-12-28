@@ -67,10 +67,16 @@ const db = new sqlite3.Database('./raffle.db', (err) => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       number INTEGER UNIQUE NOT NULL,
       registered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      name TEXT
+      name TEXT,
+      is_winner INTEGER DEFAULT 0
     )`, (err) => {
       if (err) {
         console.error('Ошибка создания таблицы:', err.message);
+      } else {
+        // Добавляем колонку is_winner если её нет (для существующих БД)
+        db.run(`ALTER TABLE participants ADD COLUMN is_winner INTEGER DEFAULT 0`, (err) => {
+          // Игнорируем ошибку если колонка уже существует
+        });
       }
     });
   }
@@ -190,7 +196,8 @@ app.get('/api/check-number/:number', (req, res) => {
     res.json({ 
       exists: !!row,
       number: number,
-      participant: row || null
+      participant: row || null,
+      isWinner: row ? (row.is_winner === 1) : false
     });
   });
 });
@@ -210,14 +217,37 @@ app.post('/api/raffle', (req, res) => {
       });
     }
 
-    // Перемешиваем массив и выбираем случайных
-    const shuffled = [...participants].sort(() => Math.random() - 0.5);
-    const winners = shuffled.slice(0, count);
+    // Сбрасываем всех победителей перед новым розыгрышем
+    db.run('UPDATE participants SET is_winner = 0', (err) => {
+      if (err) {
+        return res.status(500).json({ error: 'Ошибка сброса победителей' });
+      }
 
-    res.json({
-      winners: winners,
-      total: participants.length,
-      selected: count
+      // Перемешиваем массив и выбираем случайных
+      const shuffled = [...participants].sort(() => Math.random() - 0.5);
+      const winners = shuffled.slice(0, count);
+      const winnerNumbers = winners.map(w => w.number);
+
+      // Обновляем победителей в базе данных
+      const placeholders = winnerNumbers.map(() => '?').join(',');
+      db.run(`UPDATE participants SET is_winner = 1 WHERE number IN (${placeholders})`, winnerNumbers, (err) => {
+        if (err) {
+          return res.status(500).json({ error: 'Ошибка сохранения победителей' });
+        }
+
+        // Получаем обновленных победителей
+        db.all(`SELECT * FROM participants WHERE number IN (${placeholders})`, winnerNumbers, (err, updatedWinners) => {
+          if (err) {
+            return res.status(500).json({ error: 'Ошибка получения победителей' });
+          }
+
+          res.json({
+            winners: updatedWinners,
+            total: participants.length,
+            selected: count
+          });
+        });
+      });
     });
   });
 });
